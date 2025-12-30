@@ -1,0 +1,145 @@
+name: macOS Build (RIME only, arm64)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "*" ]
+  schedule:
+    - cron: '0 23 * * *'
+    - cron: '0 4 * * *'
+
+jobs:
+  check-latest-commit:
+    runs-on: ubuntu-latest
+    outputs:
+      skip_build: ${{ steps.check.outputs.skip_build }}
+    steps:
+      - name: Check if build is needed
+        id: check
+        shell: bash
+        run: |
+          # 1️⃣ 获取 librime-macos-prebuilder latest release body
+          latest_body=$(curl -s https://api.github.com/repos/MokOopsing/librime-macos-prebuilder/releases/latest | jq -r '.body')
+          latest_commit=$(echo "$latest_body" | grep -Eo 'commit [0-9a-f]{7,40}' | awk '{print $2}')
+
+          if [ -z "$latest_commit" ]; then
+            echo "No commit found in latest release body, continue build."
+          fi
+
+          # 2️⃣ 获取 librime 最新 commit id
+          latest_librime_commit=$(curl -s https://api.github.com/repos/rime/librime/commits/master | jq -r '.sha')
+
+          echo "Latest release commit: $latest_commit"
+          echo "Latest librime commit: $latest_librime_commit"
+          # 3️⃣ 比对
+          if [ "$latest_commit" = "$latest_librime_commit" ]; then
+            echo "Commit matches latest release, skipping build."
+            echo "skip_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  clean-release-assets:
+    needs: check-latest-commit
+    if: needs.check-latest-commit.outputs.skip_build != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all .so assets in 'latest' release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo="${{ github.repository }}"
+          api="https://api.github.com/repos/$repo"
+          release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api/releases/tags/latest" | jq -r .id)
+
+          if [ "$release_id" = "null" ]; then
+            echo "Release 'latest' not found. Skipping."
+            exit 0
+          fi
+
+          curl -s -H "Authorization: token $GITHUB_TOKEN" "$api/releases/$release_id/assets" \
+          | jq -r '.[] | select(.name | endswith(".tar.bz2")) | .id' \
+          | xargs -r -I{} curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" "$api/releases/assets/{}"
+
+  build:
+    needs: [check-latest-commit, clean-release-assets]
+    if: needs.check-latest-commit.outputs.skip_build != 'true'
+    runs-on: macos-latest
+
+    steps:
+      # 1️⃣ 拉取 fcitx5-prebuilder 仓库，递归子模块
+      - name: Checkout fcitx5-prebuilder
+        uses: actions/checkout@v6
+        with:
+          repository: fcitx-contrib/fcitx5-prebuilder
+          path: fcitx5-prebuilder
+          submodules: recursive
+      # 更新特定子模块到最新 commit
+      - name: Update specific submodules to latest commit
+        working-directory: fcitx5-prebuilder
+        run: |
+          git -C librime fetch origin master && git -C librime reset --hard origin/master
+          git -C librime-lua fetch origin master && git -C librime-lua reset --hard origin/master
+          git -C librime-octagram fetch origin master && git -C librime-octagram reset --hard origin/master
+
+      # 2️⃣ 获取当前最新commit id
+      - name: Get fcitx5-prebuilder commit id
+        id: get-commit
+        working-directory: fcitx5-prebuilder/librime
+        run: echo "commit_id=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          repository: google/mozc
+          path: fcitx5-prebuilder/libmozc/mozc
+          ref: 3feec1b11cd72d0af182da3f80bc3988a7ec3f10
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: |
+          brew install \
+            extra-cmake-modules \
+            autoconf automake libtool autoconf-archive \
+            bison vala cbindgen || true # ignore brew link python error
+          pip install -r requirements.txt
+          echo /opt/homebrew/opt/bison/bin >> $GITHUB_PATH
+
+      - name: Version info
+        run: |
+          bison --version
+          clang --version
+          cmake --version
+          valac --version
+          rustc --version
+
+      - name: Build
+        run: python scripts/build.py macos arm64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: artifact-macos-arm64
+          path: |
+            build/macos-arm64/*.tar.bz2
+
+      # 9️⃣ 上传到 GitHub Release (tag: latest)
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "macOS RIME Build"
+          body: |
+            This artifact was automatically built by GitHub Actions
+            from commit ${{ steps.get-commit.outputs.commit_id }} of [rime/librime](https://github.com/rime/librime).
+
+          files: |
+            build/macos-arm64/*.tar.bz2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
