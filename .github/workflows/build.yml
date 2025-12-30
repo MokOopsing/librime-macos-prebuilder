@@ -18,6 +18,7 @@ jobs:
         id: check
         shell: bash
         run: |
+          set -x
           # 1️⃣ 获取 librime-macos-prebuilder latest release body
           latest_body=$(curl -s https://api.github.com/repos/MokOopsing/librime-macos-prebuilder/releases/latest | jq -r '.body')
           latest_commit=$(echo "$latest_body" | grep -Eo 'commit [0-9a-f]{7,40}' | awk '{print $2}')
