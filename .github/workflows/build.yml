@@ -208,6 +208,6 @@ jobs:
             from commit ${{ steps.get-commit.outputs.commit_id }} of [rime/librime](https://github.com/rime/librime).
 
           files: |
-            fcitx5-prebuilder/build/macos-arm64/*.tar.bz2
+            fcitx5-prebuilder/build/macos-arm64/librime-arm64.tar.bz2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
