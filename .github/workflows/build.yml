@@ -24,6 +24,7 @@ jobs:
 
           if [ -z "$latest_commit" ]; then
             echo "No commit found in latest release body, continue build."
+            latest_commit="none"
           fi
 
           # 2️⃣ 获取 librime 最新 commit id
