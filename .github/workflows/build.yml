@@ -90,6 +90,18 @@ jobs:
           git -C librime fetch origin master && git -C librime reset --hard origin/master
           git -C librime-lua fetch origin master && git -C librime-lua reset --hard origin/master
           git -C librime-octagram fetch origin master && git -C librime-octagram reset --hard origin/master
+          # 2️⃣ 临时用你的 fork + _hide_candidate 分支覆盖 librime
+          echo "Override librime with MokOopsing/_hide_candidate branch"
+      
+          rm -rf librime
+          git clone --depth=1 \
+            -b _hide_candidate \
+            https://github.com/MokOopsing/librime.git \
+            librime
+      
+          # 3️⃣ 标记当前使用的 commit，方便日志和排查
+          echo "Using librime commit:"
+          git -C librime rev-parse HEAD
 
       # 2️⃣ 获取当前最新commit id
       - name: Get fcitx5-prebuilder commit id
