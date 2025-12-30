@@ -21,19 +21,25 @@ jobs:
           set -x
           # 1️⃣ 获取 librime-macos-prebuilder latest release body
           latest_body=$(curl -s https://api.github.com/repos/MokOopsing/librime-macos-prebuilder/releases/latest | jq -r '.body')
-          latest_commit=$(echo "$latest_body" | grep -Eo 'commit [0-9a-f]{7,40}' | awk '{print $2}')
 
+          # 如果没有 Release
+          if [ "$latest_body" = "null" ]; then
+            echo "No release found, continue build."
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          latest_commit=$(echo "$latest_body" | grep -Eo 'commit [0-9a-f]{7,40}' | awk '{print $2}')
           if [ -z "$latest_commit" ]; then
             echo "No commit found in latest release body, continue build."
             latest_commit="none"
           fi
-
-          # 2️⃣ 获取 librime 最新 commit id
+          
           latest_librime_commit=$(curl -s https://api.github.com/repos/rime/librime/commits/master | jq -r '.sha')
-
+          
           echo "Latest release commit: $latest_commit"
           echo "Latest librime commit: $latest_librime_commit"
-          # 3️⃣ 比对
+          
           if [ "$latest_commit" = "$latest_librime_commit" ]; then
             echo "Commit matches latest release, skipping build."
             echo "skip_build=true" >> $GITHUB_OUTPUT
