@@ -130,21 +130,52 @@ jobs:
 
       - name: Build
         working-directory: fcitx5-prebuilder
-        run: python scripts/build.py macos arm64
+        run: |
+          python - << 'EOF'
+          from scripts.dependencies import dag
+
+          # librime 的完整依赖闭包
+          def collect_deps(root):
+              result = set([root])
+              stack = [root]
+              while stack:
+                  cur = stack.pop()
+                  for dep in dag.get(cur, []):
+                      if dep not in result:
+                          result.add(dep)
+                          stack.append(dep)
+              return result
+          
+          deps = collect_deps("librime")
+          
+          path = "scripts/dependencies.py"
+          with open(path) as f:
+              text = f.read()
+          
+          import re
+          text = re.sub(
+              r"macos\s*=\s*\[[\s\S]*?\]",
+              "macos = [\n" + "\n".join(f"    '{d}'," for d in sorted(deps)) + "\n]",
+              text,
+          )
+          
+          with open(path, "w") as f:
+              f.write(text)
+          
+          print("macos projects limited to:", sorted(deps))
+          EOF
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: artifact-macos-arm64
-          working-directory: fcitx5-prebuilder
           path: |
-            build/macos-arm64/*.tar.bz2
+            fcitx5-prebuilder/build/macos-arm64/*.tar.bz2
 
       # 9️⃣ 上传到 GitHub Release (tag: latest)
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          working-directory: fcitx5-prebuilder
           tag_name: latest
           name: "macOS RIME Build"
           body: |
@@ -152,6 +183,6 @@ jobs:
             from commit ${{ steps.get-commit.outputs.commit_id }} of [rime/librime](https://github.com/rime/librime).
 
           files: |
-            build/macos-arm64/*.tar.bz2
+            fcitx5-prebuilder/build/macos-arm64/*.tar.bz2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
