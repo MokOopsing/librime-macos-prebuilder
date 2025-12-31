@@ -5,8 +5,8 @@ on:
   push:
     branches: [ "*" ]
   schedule:
-    - cron: '0 23 * * *'
-    - cron: '0 4 * * *'
+    - cron: '0 22 * * *'
+    - cron: '0 3 * * *'
 
 jobs:
   check-latest-commit:
@@ -83,6 +83,7 @@ jobs:
           repository: fcitx-contrib/fcitx5-prebuilder
           path: fcitx5-prebuilder
           submodules: recursive
+
       # 更新特定子模块到最新 commit
       - name: Update specific submodules to latest commit
         working-directory: fcitx5-prebuilder
@@ -90,6 +91,16 @@ jobs:
           git -C librime fetch origin master && git -C librime reset --hard origin/master
           git -C librime-lua fetch origin master && git -C librime-lua reset --hard origin/master
           git -C librime-octagram fetch origin master && git -C librime-octagram reset --hard origin/master
+
+      # 2️⃣ 获取当前最新commit id
+      - name: Get fcitx5-prebuilder commit id
+        id: get-commit
+        working-directory: fcitx5-prebuilder/librime
+        run: echo "commit_id=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: temp use _hide_candidate
+        working-directory: fcitx5-prebuilder
+        run: |
           # 2️⃣ 临时用你的 fork + _hide_candidate 分支覆盖 librime
           echo "Override librime with MokOopsing/_hide_candidate branch"
       
@@ -102,12 +113,6 @@ jobs:
           # 3️⃣ 标记当前使用的 commit，方便日志和排查
           echo "Using librime commit:"
           git -C librime rev-parse HEAD
-
-      # 2️⃣ 获取当前最新commit id
-      - name: Get fcitx5-prebuilder commit id
-        id: get-commit
-        working-directory: fcitx5-prebuilder/librime
-        run: echo "commit_id=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
       - uses: actions/checkout@v6
         with:
