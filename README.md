@@ -1,6 +1,6 @@
 # librime-macos-prebuilder
 
-本仓库用于在 **macOS 平台上对 librime 进行 rolling build（滚动构建）**。
+本仓库用于在 **macOS 平台上对 librime 进行 rolling build（滚动构建、仅服务于Fcitx5 macOS的fcitx5-rime插件）**。
 
 仓库本身不包含任何源代码，仅作为一个 **CI-only 仓库**，通过 GitHub Actions 自动拉取并复用  
 `fcitx-contrib/fcitx5-prebuilder` 的构建体系，对 `rime/librime` 进行持续编译。
