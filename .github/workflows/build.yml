@@ -100,6 +100,7 @@ jobs:
 
       - name: temp use _hide_candidate
         working-directory: fcitx5-prebuilder
+        if: false
         run: |
           # 2️⃣ 临时用你的 fork + _hide_candidate 分支覆盖 librime
           echo "Override librime with MokOopsing/_hide_candidate branch"
