@@ -67,7 +67,7 @@ jobs:
           fi
 
           curl -s -H "Authorization: token $GITHUB_TOKEN" "$api/releases/$release_id/assets" \
-          | jq -r '.[] | select(.name | endswith(".tar.bz2")) | .id' \
+          | jq -r '.[] | select(.name | startswith("librime") and endswith(".tar.bz2")) | .id' \
           | xargs -r -I{} curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" "$api/releases/assets/{}"
 
   build:
