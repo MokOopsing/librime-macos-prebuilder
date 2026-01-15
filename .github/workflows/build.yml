@@ -100,7 +100,7 @@ jobs:
 
       - name: temp use _hide_candidate
         working-directory: fcitx5-prebuilder/librime
-        if: true
+        if: false
         run: |
           # 2️⃣ 临时用你的 fork + _hide_candidate 分支覆盖 librime
           echo "Override librime with 82ba0b14d836278917aa2c357dfba05d17250f80"
