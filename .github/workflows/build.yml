@@ -99,17 +99,13 @@ jobs:
         run: echo "commit_id=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
       - name: temp use _hide_candidate
-        working-directory: fcitx5-prebuilder
-        if: false
+        working-directory: fcitx5-prebuilder/librime
+        if: true
         run: |
           # 2️⃣ 临时用你的 fork + _hide_candidate 分支覆盖 librime
-          echo "Override librime with MokOopsing/_hide_candidate branch"
+          echo "Override librime with 82ba0b14d836278917aa2c357dfba05d17250f80"
       
-          rm -rf librime
-          git clone --depth=1 \
-            -b _hide_candidate \
-            https://github.com/MokOopsing/librime.git \
-            librime
+          git reset --hard 82ba0b14d836278917aa2c357dfba05d17250f80
       
           # 3️⃣ 标记当前使用的 commit，方便日志和排查
           echo "Using librime commit:"
