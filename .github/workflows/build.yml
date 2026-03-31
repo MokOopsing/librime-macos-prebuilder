@@ -171,6 +171,7 @@ jobs:
       
           echo "Before filtering:"
           wc -l patches/librime.patch || true
+          cat patches/librime.patch
       
           filterdiff -x '*/src/rime_api_impl.h' patches/librime.patch > patches/librime.filtered.patch
       
@@ -178,6 +179,7 @@ jobs:
       
           echo "After filtering:"
           wc -l patches/librime.patch || true
+          cat patches/librime.patch
 
       - name: Filter patch file
         working-directory: fcitx5-prebuilder
