@@ -70,6 +70,55 @@ jobs:
           | jq -r '.[] | select(.name | startswith("librime") and endswith(".tar.bz2")) | .id' \
           | xargs -r -I{} curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" "$api/releases/assets/{}"
 
+  update-release-when-skipped:
+    needs: check-latest-commit
+    if: needs.check-latest-commit.outputs.skip_build == 'true'
+    runs-on: ubuntu-latest
+  
+    steps:
+      - name: Update release body (keep alive)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+  
+          repo="${{ github.repository }}"
+          api="https://api.github.com/repos/$repo"
+  
+          # 获取 latest release
+          release_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "$api/releases/tags/latest")
+  
+          release_id=$(echo "$release_json" | jq -r .id)
+          old_body=$(echo "$release_json" | jq -r .body)
+  
+          if [ "$release_id" = "null" ]; then
+            echo "No release found, skipping."
+            exit 0
+          fi
+  
+          now=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+  
+          # 去掉旧的检查时间（防止无限增长）
+          cleaned_body=$(echo "$old_body" | sed '/Last check:/d')
+  
+          new_body=$(cat <<EOF
+          $cleaned_body
+          
+          ---
+          Last check: $now
+          Status: No new commits, build skipped.
+          EOF
+          )
+  
+          # 更新 release
+          curl -s -X PATCH \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg body "$new_body" '{body: $body}')" \
+            "$api/releases/$release_id"
+  
+          echo "Release body updated."
+
   build:
     needs: [check-latest-commit, clean-release-assets]
     if: needs.check-latest-commit.outputs.skip_build != 'true'
@@ -110,6 +159,35 @@ jobs:
           # 3️⃣ 标记当前使用的 commit，方便日志和排查
           echo "Using librime commit:"
           git -C librime rev-parse HEAD
+
+      - name: Install patchutils (for filterdiff)
+        run: |
+          brew install patchutils
+      
+      - name: Filter patch file (remove rime_api_impl.h changes)
+        working-directory: fcitx5-prebuilder
+        run: |
+          set -e
+      
+          echo "Before filtering:"
+          wc -l patches/librime.patch || true
+      
+          filterdiff -x '*/src/rime_api_impl.h' patches/librime.patch > patches/librime.filtered.patch
+      
+          mv patches/librime.filtered.patch patches/librime.patch
+      
+          echo "After filtering:"
+          wc -l patches/librime.patch || true
+
+      - name: Filter patch file
+        working-directory: fcitx5-prebuilder
+        if: false
+        run: |
+          awk 'BEGIN{skip=0}
+          /^diff --git /{skip=($0 ~ /src\/rime_api_impl\.h/)}
+          !skip' patches/librime.patch > patches/librime.filtered.patch
+
+          mv patches/librime.filtered.patch patches/librime.patch
 
       - uses: actions/checkout@v6
         with:
