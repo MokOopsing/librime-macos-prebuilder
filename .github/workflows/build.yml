@@ -134,7 +134,7 @@ jobs:
           submodules: recursive
 
       # 更新特定子模块到最新 commit
-      - name: Update specific submodules to latest commit
+      - name: Replace librime.patch
         run: |
           cp -f patches/librime.patch fcitx5-prebuilder/patches/librime.patch
           echo "after replace:"
