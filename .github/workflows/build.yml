@@ -191,16 +191,9 @@ jobs:
 
           mv patches/librime.filtered.patch patches/librime.patch
 
-      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
         with:
-          submodules: recursive
-          repository: google/mozc
-          path: fcitx5-prebuilder/libmozc/mozc
-          ref: 3feec1b11cd72d0af182da3f80bc3988a7ec3f10
-
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.14'
+          python-version: '3.15'
 
       - name: Install dependencies
         working-directory: fcitx5-prebuilder
@@ -213,6 +206,9 @@ jobs:
             bison vala cbindgen || true # ignore brew link python error
           pip install -r requirements.txt
           echo /opt/homebrew/opt/bison/bin >> $GITHUB_PATH
+          if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
+            rustup target add x86_64-apple-darwin
+          fi
 
       - name: Version info
         run: |
@@ -277,7 +273,7 @@ jobs:
           echo "====================================="
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: artifact-macos-arm64
           path: |
