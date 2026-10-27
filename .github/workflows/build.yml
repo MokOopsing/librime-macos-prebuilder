@@ -135,6 +135,14 @@ jobs:
 
       # 更新特定子模块到最新 commit
       - name: Update specific submodules to latest commit
+        run: |
+          cp -f patches/librime.patch fcitx5-prebuilder/patches/librime.patch
+          echo "after replace:"
+          wc -l fcitx5-prebuilder/patches/librime.patch || true
+          cat fcitx5-prebuilder/patches/librime.patch
+
+      # 更新特定子模块到最新 commit
+      - name: Update specific submodules to latest commit
         working-directory: fcitx5-prebuilder
         run: |
           git -C librime fetch origin master && git -C librime reset --hard origin/master
