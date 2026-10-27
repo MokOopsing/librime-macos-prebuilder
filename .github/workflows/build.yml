@@ -136,6 +136,7 @@ jobs:
       # 更新特定子模块到最新 commit
       - name: Replace librime.patch
         run: |
+          pwd
           cp -f patches/librime.patch fcitx5-prebuilder/patches/librime.patch
           echo "after replace:"
           wc -l fcitx5-prebuilder/patches/librime.patch || true
