@@ -137,6 +137,7 @@ jobs:
       - name: Replace librime.patch
         run: |
           pwd
+          ls -l
           cp -f patches/librime.patch fcitx5-prebuilder/patches/librime.patch
           echo "after replace:"
           wc -l fcitx5-prebuilder/patches/librime.patch || true
