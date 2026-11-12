@@ -5,7 +5,7 @@ index 8faa61f..5170fa2 100644
 @@ -156,6 +156,14 @@ if(BUILD_SHARED_LIBS)
  else()
    add_library(rime-static STATIC ${rime_src})
-   target_link_libraries(rime-static ${rime_deps})
+   target_link_libraries(rime-static PUBLIC ${rime_deps})
 +  if (EMSCRIPTEN OR (APPLE AND NOT IOS))
 +    target_compile_definitions(rime-static PRIVATE -DUSE_WEBVIEW)
 +    target_link_options(rime-static PUBLIC
