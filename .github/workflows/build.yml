@@ -223,6 +223,75 @@ jobs:
             rustup target add x86_64-apple-darwin
           fi
 
+      - name: Replace glog with standalone spdlog
+        working-directory: fcitx5-prebuilder
+        run: |
+          set -e
+          spdlog_commit=$(git -C librime ls-tree HEAD deps/spdlog | awk '$1 == "160000" {print $3}')
+          if [ -z "$spdlog_commit" ]; then
+            echo "Could not find librime's pinned deps/spdlog commit" >&2
+            exit 1
+          fi
+          git clone https://github.com/gabime/spdlog.git spdlog
+          git -C spdlog checkout --detach "$spdlog_commit"
+          echo "Using spdlog commit: $(git -C spdlog rev-parse HEAD)"
+
+          # Apply the existing librime patch before patching its CMake lookup.
+          git -C librime apply "$PWD/patches/librime.patch"
+
+          cat > scripts/spdlog.py <<'PY'
+          from common import CMakeBuilder
+
+          CMakeBuilder(
+              "spdlog",
+              [
+                  "-DSPDLOG_BUILD_SHARED=OFF",
+                  "-DSPDLOG_BUILD_PIC=ON",
+                  "-DSPDLOG_BUILD_EXAMPLE=OFF",
+                  "-DSPDLOG_BUILD_TESTS=OFF",
+                  "-DSPDLOG_INSTALL=ON",
+              ],
+          ).exec()
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+
+          dependencies = Path("scripts/dependencies.py")
+          text = dependencies.read_text()
+          if text.count('"glog"') != 4:
+              raise SystemExit("Unexpected glog entries in scripts/dependencies.py")
+          dependencies.write_text(text.replace('"glog"', '"spdlog"'))
+
+          cmake_lists = Path("librime/CMakeLists.txt")
+          text = cmake_lists.read_text()
+          start_marker = (
+              '  # Always use the bundled, pinned spdlog so that the library is linked\n'
+              '  # statically and no new runtime dependency is introduced.\n'
+              '  if(NOT TARGET spdlog::spdlog)\n'
+              '    if(NOT EXISTS "${PROJECT_SOURCE_DIR}/deps/spdlog/CMakeLists.txt")'
+          )
+          end_marker = (
+              '  if(NOT TARGET spdlog::spdlog)\n'
+              '    message(FATAL_ERROR "spdlog target not found")\n'
+              '  endif()'
+          )
+          if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+              raise SystemExit("Could not locate librime's bundled spdlog block")
+          start = text.index(start_marker)
+          end = text.index(end_marker, start) + len(end_marker)
+          text = (
+              text[:start]
+              + '  # Use the standalone spdlog package built by fcitx5-prebuilder.\n'
+              + '  find_package(spdlog CONFIG REQUIRED)\n'
+              + '  if(NOT TARGET spdlog::spdlog)\n'
+              + '    message(FATAL_ERROR "spdlog package did not define spdlog::spdlog")\n'
+              + '  endif()'
+              + text[end:]
+          )
+          cmake_lists.write_text(text)
+          PY
+
       - name: Version info
         run: |
           bison --version
@@ -273,6 +342,12 @@ jobs:
         run: |
           python - << 'EOF'
           from scripts.dependencies import macos
+          if "spdlog" not in macos:
+              raise SystemExit("spdlog is missing from the macOS build list")
+          if "glog" in macos:
+              raise SystemExit("glog should not be built for librime")
+          if "librime" not in macos:
+              raise SystemExit("librime is missing from the macOS build list")
           print("macos projects:", macos)
           EOF
 
