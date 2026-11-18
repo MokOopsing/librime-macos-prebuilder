@@ -471,7 +471,19 @@ jobs:
                       ],
                   )
           ''',
-                  "class LibrimeBuilder(CMakeBuilder):\n    pass\n",
+                  "class LibrimeBuilder(CMakeBuilder):\n"
+                  "    def install(self):\n"
+                  "        super().install()\n"
+                  "        spdlog_library = f\"{ROOT}/build/{USR}/lib/libspdlog.a\"\n"
+                  "        if not os.path.isfile(spdlog_library):\n"
+                  "            build_prefix = USR.rsplit(INSTALL_PREFIX, 1)[0]\n"
+                  "            spdlog_library = f\"{ROOT}/build/{build_prefix}/deps/spdlog/libspdlog.a\"\n"
+                  "        if not os.path.isfile(spdlog_library):\n"
+                  "            raise SystemExit(\"Could not locate the built libspdlog.a\")\n"
+                  "        ensure(\n"
+                  "            \"cp\",\n"
+                  "            [spdlog_library, f\"{self.dest_dir}{INSTALL_PREFIX}/lib\"],\n"
+                  "        )\n",
               ),
           ]
           for old, new in replacements:
