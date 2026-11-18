@@ -223,7 +223,46 @@ jobs:
             rustup target add x86_64-apple-darwin
           fi
 
+      - name: Check upstream spdlog integration
+        id: spdlog-compat
+        working-directory: fcitx5-prebuilder
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.dependencies import dag
+
+          librime_deps = dag.get("librime", [])
+          cmake = Path("librime/CMakeLists.txt").read_text()
+
+          if (
+              "glog" not in librime_deps
+              and "spdlog" in librime_deps
+              and Path("scripts/spdlog.py").is_file()
+              and "find_package(spdlog" in cmake
+          ):
+              mode = "standalone"
+          elif (
+              "glog" not in librime_deps
+              and "spdlog" not in librime_deps
+              and "add_subdirectory(deps/spdlog" in cmake
+          ):
+              mode = "bundled"
+          else:
+              mode = "workaround"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"mode={mode}\n")
+          print(f"spdlog integration mode: {mode}")
+          PY
+
+      - name: Initialize upstream bundled spdlog
+        if: steps.spdlog-compat.outputs.mode == 'bundled'
+        working-directory: fcitx5-prebuilder
+        run: git -C librime submodule update --init deps/spdlog
+
       - name: Replace glog with standalone spdlog
+        if: steps.spdlog-compat.outputs.mode == 'workaround'
         working-directory: fcitx5-prebuilder
         run: |
           set -e
@@ -339,10 +378,13 @@ jobs:
 
       - name: Verify macOS project list
         working-directory: fcitx5-prebuilder
+        env:
+          SPDLOG_MODE: ${{ steps.spdlog-compat.outputs.mode }}
         run: |
           python - << 'EOF'
+          import os
           from scripts.dependencies import macos
-          if "spdlog" not in macos:
+          if os.environ["SPDLOG_MODE"] != "bundled" and "spdlog" not in macos:
               raise SystemExit("spdlog is missing from the macOS build list")
           if "glog" in macos:
               raise SystemExit("glog should not be built for librime")
@@ -353,7 +395,42 @@ jobs:
 
       - name: Build
         working-directory: fcitx5-prebuilder
+        env:
+          RIME_PLUGINS: "lua octagram predict"
         run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/librime.py")
+          text = path.read_text()
+          replacements = [
+              ('patch("librime-qjs")\n', ""),
+              (
+                  'for plugin in ("lua", "octagram", "predict", "qjs"):',
+                  'for plugin in ("lua", "octagram", "predict"):',
+              ),
+              (
+                  '''class LibrimeBuilder(CMakeBuilder):
+              def install(self):
+                  super().install()
+                  ensure(
+                      "cp",
+                      [
+                          f"{ROOT}/librime-qjs/build/libqjs.a",
+                          f"{self.dest_dir}{INSTALL_PREFIX}/lib",
+                      ],
+                  )
+          ''',
+                  "class LibrimeBuilder(CMakeBuilder):\n    pass\n",
+              ),
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f"Could not uniquely patch librime.py: {old!r}")
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+
           python scripts/build.py macos arm64
           echo "SRC After filtering:"
           echo "====================================="
