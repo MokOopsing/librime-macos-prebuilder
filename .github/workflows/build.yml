@@ -128,13 +128,17 @@ jobs:
       - name: Checkout self
         uses: actions/checkout@v6
 
-      # 1️⃣ 拉取 fcitx5-prebuilder 仓库，递归子模块
+      # 1️⃣ 拉取 fcitx5-prebuilder 仓库，不递归初始化无关子模块
       - name: Checkout fcitx5-prebuilder
         uses: actions/checkout@v6
         with:
           repository: fcitx-contrib/fcitx5-prebuilder
           path: fcitx5-prebuilder
-          submodules: recursive
+          submodules: false
+
+      - name: Initialize librime submodule
+        working-directory: fcitx5-prebuilder
+        run: git submodule update --init -- librime
 
       # 更新特定子模块到最新 commit
       - name: Replace librime.patch
@@ -151,8 +155,6 @@ jobs:
         working-directory: fcitx5-prebuilder
         run: |
           git -C librime fetch origin master && git -C librime reset --hard origin/master
-          git -C librime-lua fetch origin master && git -C librime-lua reset --hard origin/master
-          git -C librime-octagram fetch origin master && git -C librime-octagram reset --hard origin/master
 
       # 2️⃣ 获取当前最新commit id
       - name: Get fcitx5-prebuilder commit id
@@ -222,6 +224,54 @@ jobs:
           if [[ "${{ matrix.arch }}" == "x86_64" ]]; then
             rustup target add x86_64-apple-darwin
           fi
+
+      - name: Initialize required build submodules
+        working-directory: fcitx5-prebuilder
+        run: |
+          python - <<'PY'
+          import subprocess
+          from scripts.dependencies import dag
+
+          def collect_deps(root):
+              result = {root}
+              stack = [root]
+              while stack:
+                  for dep in dag.get(stack.pop(), []):
+                      if dep not in result:
+                          result.add(dep)
+                          stack.append(dep)
+              return result
+
+          required = collect_deps("librime")
+          required.discard("glog")
+          required.discard("librime")
+          required.update({"librime-lua", "librime-octagram", "librime-predict"})
+
+          result = subprocess.run(
+              ["git", "config", "--file", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$"],
+              check=True,
+              capture_output=True,
+              text=True,
+          )
+          registered = {
+              line.split(maxsplit=1)[1] for line in result.stdout.splitlines()
+          }
+          # Boost is downloaded by scripts/boost.py rather than stored as a submodule.
+          missing = required - registered - {"boost"}
+          if missing:
+              raise SystemExit(
+                  f"Required projects are not registered submodules: {sorted(missing)}"
+              )
+
+          paths = sorted(required & registered)
+          print("Initializing required submodules only:", paths)
+          subprocess.run(
+              ["git", "submodule", "update", "--init", "--", *paths],
+              check=True,
+          )
+          PY
+          git -C librime-lua fetch origin master && git -C librime-lua reset --hard origin/master
+          git -C librime-octagram fetch origin master && git -C librime-octagram reset --hard origin/master
 
       - name: Check upstream spdlog integration
         id: spdlog-compat
