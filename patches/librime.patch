@@ -253,10 +253,10 @@ index a69ae74..9b3d4b1 100644
    time_t last_active_time_ = 0;
    string commit_text_;
  };
-diff --git a/src/rime_api_impl.h b/src/rime_api_impl.h
+diff --git a/src/rime_api_impl.cc b/src/rime_api_impl.cc
 index 30f4514..c17d479 100644
---- a/src/rime_api_impl.h
-+++ b/src/rime_api_impl.h
+--- a/src/rime_api_impl.cc
++++ b/src/rime_api_impl.cc
 @@ -17,6 +17,8 @@
  #include <rime/setup.h>
  #include <rime/signature.h>
