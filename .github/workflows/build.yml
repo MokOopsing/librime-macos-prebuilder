@@ -179,7 +179,7 @@ jobs:
         run: |
           brew install patchutils
       
-      - name: Filter patch file (remove rime_api_impl.h changes)
+      - name: Filter patch file (remove rime_api_impl.cc changes)
         working-directory: fcitx5-prebuilder
         run: |
           set -e
@@ -188,7 +188,7 @@ jobs:
           wc -l patches/librime.patch || true
           cat patches/librime.patch
       
-          filterdiff -x '*/src/rime_api_impl.h' patches/librime.patch > patches/librime.filtered.patch
+          filterdiff -x '*/src/rime_api_impl.cc' patches/librime.patch > patches/librime.filtered.patch
       
           mv patches/librime.filtered.patch patches/librime.patch
       
@@ -201,7 +201,7 @@ jobs:
         if: false
         run: |
           awk 'BEGIN{skip=0}
-          /^diff --git /{skip=($0 ~ /src\/rime_api_impl\.h/)}
+          /^diff --git /{skip=($0 ~ /src\/rime_api_impl\.cc/)}
           !skip' patches/librime.patch > patches/librime.filtered.patch
 
           mv patches/librime.filtered.patch patches/librime.patch
@@ -496,7 +496,7 @@ jobs:
           python scripts/build.py macos arm64
           echo "SRC After filtering:"
           echo "====================================="
-          cat librime/src/rime_api_impl.h
+          cat librime/src/rime_api_impl.cc
           echo "====================================="
 
       - name: Upload artifact
